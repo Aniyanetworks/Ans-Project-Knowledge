@@ -59,11 +59,50 @@ export async function submitManualText({ projectId, text, userId, label }) {
 }
 
 /**
+ * Update a manually-pasted document's text and re-run ingestion. Clears any
+ * existing chunks first so the old embeddings don't linger alongside new ones,
+ * and resets status so the ingestion status UI reflects the re-run.
+ */
+export async function updateManualText({ documentId, text, label }) {
+  const { error: chunkErr } = await supabase
+    .from('document_chunks')
+    .delete()
+    .eq('document_id', documentId)
+  if (chunkErr) throw chunkErr
+
+  const { error: updateErr } = await supabase
+    .from('documents')
+    .update({
+      raw_text: text,
+      original_filename: label || 'Pasted text',
+      status: 'pending',
+      error_message: null,
+    })
+    .eq('id', documentId)
+  if (updateErr) throw updateErr
+
+  await triggerIngest(documentId)
+}
+
+/**
+ * Delete a document: removes its Storage object (if any) and its DB row.
+ * document_chunks and any other FK-dependent rows cascade via ON DELETE CASCADE.
+ */
+export async function deleteDocument({ documentId, storagePath }) {
+  if (storagePath) {
+    const { error: storageErr } = await supabase.storage.from(STORAGE_BUCKET).remove([storagePath])
+    if (storageErr) throw storageErr
+  }
+  const { error } = await supabase.from('documents').delete().eq('id', documentId)
+  if (error) throw error
+}
+
+/**
  * Notify the n8n ingestion workflow that a new document is ready to process.
  * n8n fetches the document row itself (via service role) so we only need to
  * pass the id — this keeps the payload small and avoids re-uploading file bytes.
  */
-async function triggerIngest(documentId) {
+export async function triggerIngest(documentId) {
   if (!INGEST_WEBHOOK_URL) {
     console.warn('VITE_N8N_INGEST_WEBHOOK_URL is not set — skipping ingestion trigger.')
     return
