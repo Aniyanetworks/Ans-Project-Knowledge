@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
 import DocumentsTab from './DocumentsTab'
 import DevelopersTab from './DevelopersTab'
+import ConfirmDialog from '../../components/ConfirmDialog'
 
 const TABS = ['Transcripts', 'Images', 'Developers']
 
@@ -18,6 +19,7 @@ export default function ProjectDetail() {
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState(null)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
 
   useEffect(() => {
     loadProject()
@@ -55,16 +57,13 @@ export default function ProjectDetail() {
     setSaving(false)
   }
 
-  async function deleteProject() {
-    const confirmed = window.confirm(
-      `Delete "${project.name}"? This permanently removes all its documents, chunks, and Q&A history. This cannot be undone.`
-    )
-    if (!confirmed) return
+  async function confirmDelete() {
     setDeleting(true)
     const { error } = await supabase.from('projects').delete().eq('id', projectId)
     if (error) {
       setError(error.message)
       setDeleting(false)
+      setConfirmingDelete(false)
     } else {
       navigate('/admin')
     }
@@ -124,7 +123,7 @@ export default function ProjectDetail() {
                 Edit
               </button>
               <button
-                onClick={deleteProject}
+                onClick={() => setConfirmingDelete(true)}
                 disabled={deleting}
                 className="text-sm text-red-400 hover:text-red-600 disabled:opacity-50"
               >
@@ -156,6 +155,20 @@ export default function ProjectDetail() {
       {tab === 'Transcripts' && <DocumentsTab projectId={projectId} kind="transcripts" />}
       {tab === 'Images' && <DocumentsTab projectId={projectId} kind="images" />}
       {tab === 'Developers' && <DevelopersTab projectId={projectId} />}
+
+      <ConfirmDialog
+        open={confirmingDelete}
+        title="Delete project?"
+        message={
+          project &&
+          `Delete "${project.name}"? This permanently removes all its documents, chunks, and Q&A history. This cannot be undone.`
+        }
+        confirmLabel="Delete"
+        danger
+        busy={deleting}
+        onConfirm={confirmDelete}
+        onCancel={() => setConfirmingDelete(false)}
+      />
     </div>
   )
 }

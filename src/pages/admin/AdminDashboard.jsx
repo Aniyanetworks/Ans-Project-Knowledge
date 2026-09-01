@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../contexts/AuthContext'
+import ConfirmDialog from '../../components/ConfirmDialog'
 
 export default function AdminDashboard() {
   const { user } = useAuth()
@@ -18,6 +19,7 @@ export default function AdminDashboard() {
   const [editDescription, setEditDescription] = useState('')
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState(null)
+  const [confirmTarget, setConfirmTarget] = useState(null)
 
   useEffect(() => {
     loadProjects()
@@ -87,16 +89,15 @@ export default function AdminDashboard() {
     setSaving(false)
   }
 
-  async function deleteProject(project) {
-    const confirmed = window.confirm(
-      `Delete "${project.name}"? This permanently removes all its documents, chunks, and Q&A history. This cannot be undone.`
-    )
-    if (!confirmed) return
+  async function confirmDelete() {
+    const project = confirmTarget
+    if (!project) return
     setDeletingId(project.id)
     setError(null)
     const { error } = await supabase.from('projects').delete().eq('id', project.id)
     if (error) setError(error.message)
     setDeletingId(null)
+    setConfirmTarget(null)
     loadProjects()
   }
 
@@ -212,7 +213,7 @@ export default function AdminDashboard() {
                     {p.status === 'active' ? 'Archive' : 'Unarchive'}
                   </button>
                   <button
-                    onClick={() => deleteProject(p)}
+                    onClick={() => setConfirmTarget(p)}
                     disabled={deletingId === p.id}
                     className="ml-auto text-xs text-red-400 hover:text-red-600 disabled:opacity-50"
                   >
@@ -224,6 +225,20 @@ export default function AdminDashboard() {
           )}
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!confirmTarget}
+        title="Delete project?"
+        message={
+          confirmTarget &&
+          `Delete "${confirmTarget.name}"? This permanently removes all its documents, chunks, and Q&A history. This cannot be undone.`
+        }
+        confirmLabel="Delete"
+        danger
+        busy={deletingId === confirmTarget?.id}
+        onConfirm={confirmDelete}
+        onCancel={() => setConfirmTarget(null)}
+      />
     </div>
   )
 }
