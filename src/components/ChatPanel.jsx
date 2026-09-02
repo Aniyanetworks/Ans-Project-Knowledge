@@ -105,6 +105,18 @@ export default function ChatPanel({ projectId, heightClassName = 'h-[calc(100vh-
     })
   }
 
+  function handlePaste(e) {
+    const items = e.clipboardData?.items
+    if (!items) return
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault() // don't also paste a filename/garbage into the text input
+        handlePickImage(item.getAsFile())
+        return
+      }
+    }
+  }
+
   function clearAttachedImage() {
     setAttachedImagePreview((prev) => {
       if (prev) URL.revokeObjectURL(prev)
@@ -327,7 +339,8 @@ export default function ChatPanel({ projectId, heightClassName = 'h-[calc(100vh-
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask a question about this project…"
+          onPaste={handlePaste}
+          placeholder="Ask a question about this project… (paste an image to attach it)"
           className="flex-1 rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm transition-shadow placeholder:text-slate-400 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/30"
         />
         <Button type="submit" disabled={asking || !input.trim()}>

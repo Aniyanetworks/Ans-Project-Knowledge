@@ -197,7 +197,14 @@ export default function DocumentsTab({ projectId, kind }) {
             <tbody className="divide-y divide-slate-100">
               {documents.map((doc) => (
                 <tr key={doc.id}>
-                  <td className="px-4 py-2 font-medium text-slate-800">{doc.original_filename}</td>
+                  <td className="px-4 py-2 font-medium">
+                    <button
+                      onClick={() => handleView(doc)}
+                      className="text-left text-slate-800 hover:text-accent-700 hover:underline"
+                    >
+                      {doc.original_filename}
+                    </button>
+                  </td>
                   <td className="px-4 py-2 capitalize text-slate-500">{doc.source_type}</td>
                   <td className="px-4 py-2">
                     <StatusBadge status={doc.status} />
