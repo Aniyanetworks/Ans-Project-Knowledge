@@ -1,6 +1,10 @@
 import { useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import Button from '../components/ui/Button'
+
+const inputClass =
+  'w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm transition-shadow placeholder:text-slate-400 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/30'
 
 export default function LoginPage() {
   const { session, signInWithPassword, signInWithMagicLink } = useAuth()
@@ -32,62 +36,71 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
-      <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
-        <h1 className="mb-1 text-xl font-semibold text-slate-900">Project Knowledge</h1>
-        <p className="mb-6 text-sm text-slate-500">Sign in to continue</p>
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-50 px-4">
+      <div className="pointer-events-none absolute inset-0 [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_60%,transparent_100%)]">
+        <div className="absolute -top-40 left-1/2 h-96 w-[36rem] -translate-x-1/2 rounded-full bg-gradient-to-br from-accent-400/30 to-accent-600/10 blur-3xl" />
+      </div>
 
-        {magicLinkSent ? (
-          <p className="text-sm text-green-700">
-            Check <strong>{email}</strong> for a magic sign-in link.
-          </p>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Email</label>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
-                placeholder="you@company.com"
-              />
-            </div>
+      <div className="relative w-full max-w-sm">
+        <div className="mb-6 flex flex-col items-center">
+          <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-accent-500 to-accent-700 text-lg font-bold text-white shadow-md shadow-accent-600/20">
+            P
+          </span>
+          <h1 className="text-lg font-semibold text-slate-900">Project Knowledge</h1>
+          <p className="mt-0.5 text-sm text-slate-500">Sign in to continue</p>
+        </div>
 
-            {mode === 'password' && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-7 shadow-xl shadow-slate-200/60">
+          {magicLinkSent ? (
+            <p className="text-sm text-green-700">
+              Check <strong>{email}</strong> for a magic sign-in link.
+            </p>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">Password</label>
+                <label className="mb-1.5 block text-sm font-medium text-slate-700">Email</label>
                 <input
-                  type="password"
+                  type="email"
                   required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
-                  placeholder="••••••••"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className={inputClass}
+                  placeholder="you@company.com"
                 />
               </div>
-            )}
 
-            {error && <p className="text-sm text-red-600">{error}</p>}
+              {mode === 'password' && (
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-slate-700">Password</label>
+                  <input
+                    type="password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className={inputClass}
+                    placeholder="••••••••"
+                  />
+                </div>
+              )}
 
-            <button
-              type="submit"
-              disabled={submitting}
-              className="w-full rounded-md bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50"
-            >
-              {submitting ? 'Signing in…' : mode === 'password' ? 'Sign in' : 'Send magic link'}
-            </button>
+              {error && (
+                <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+              )}
 
-            <button
-              type="button"
-              onClick={() => setMode(mode === 'password' ? 'magic-link' : 'password')}
-              className="w-full text-center text-xs text-slate-500 hover:text-slate-700"
-            >
-              {mode === 'password' ? 'Use a magic link instead' : 'Use a password instead'}
-            </button>
-          </form>
-        )}
+              <Button type="submit" disabled={submitting} className="w-full">
+                {submitting ? 'Signing in…' : mode === 'password' ? 'Sign in' : 'Send magic link'}
+              </Button>
+
+              <button
+                type="button"
+                onClick={() => setMode(mode === 'password' ? 'magic-link' : 'password')}
+                className="w-full text-center text-xs text-slate-500 hover:text-slate-700"
+              >
+                {mode === 'password' ? 'Use a magic link instead' : 'Use a password instead'}
+              </button>
+            </form>
+          )}
+        </div>
       </div>
     </div>
   )

@@ -120,21 +120,52 @@ export async function triggerIngest(documentId) {
 /**
  * Ask a question about a project. Calls the n8n Q&A webhook, which embeds the
  * question, runs vector search scoped to the project, calls the LLM, writes
- * qa_history, and returns the answer + source citations.
+ * qa_history, and returns the answer + source citations. `imagePath`, if given,
+ * is analyzed inline (vision) as context for this one answer — it is not added
+ * to the project's permanent knowledge base.
  */
-export async function askQuestion({ projectId, question, userId }) {
+export async function askQuestion({ projectId, question, userId, imagePath }) {
   if (!QA_WEBHOOK_URL) {
     throw new Error('VITE_N8N_QA_WEBHOOK_URL is not set.')
   }
   const res = await fetch(QA_WEBHOOK_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ project_id: projectId, question, user_id: userId }),
+    body: JSON.stringify({ project_id: projectId, question, user_id: userId, image_path: imagePath }),
   })
   if (!res.ok) {
     throw new Error(`Q&A request failed: ${res.status} ${await res.text()}`)
   }
   return res.json() // { answer, sources: [...], qa_history_id }
+}
+
+/**
+ * Uploads an image as an ephemeral chat attachment (separate path prefix from
+ * document uploads, so developers can do this without the broader "upload
+ * documents" permission admins have). Returns the storage path to pass to
+ * askQuestion as `imagePath`.
+ */
+export async function uploadChatImage({ projectId, file }) {
+  const path = `${projectId}/chat-attachments/${crypto.randomUUID()}/${file.name}`
+  const { error } = await supabase.storage.from(STORAGE_BUCKET).upload(path, file, { upsert: false })
+  if (error) throw error
+  return path
+}
+
+/** Deletes a single Q&A exchange from a project's chat history. */
+export async function deleteQaHistoryEntry(id) {
+  const { error } = await supabase.from('qa_history').delete().eq('id', id)
+  if (error) throw error
+}
+
+/** Clears all Q&A history for the current user in a project ("reset chat"). */
+export async function resetChatHistory({ projectId, userId }) {
+  const { error } = await supabase
+    .from('qa_history')
+    .delete()
+    .eq('project_id', projectId)
+    .eq('user_id', userId)
+  if (error) throw error
 }
 
 /** Signed URL for viewing/downloading a private storage object (default 1hr expiry). */

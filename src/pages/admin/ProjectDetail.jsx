@@ -4,8 +4,11 @@ import { supabase } from '../../lib/supabaseClient'
 import DocumentsTab from './DocumentsTab'
 import DevelopersTab from './DevelopersTab'
 import ConfirmDialog from '../../components/ConfirmDialog'
+import Button from '../../components/ui/Button'
 
 const TABS = ['Transcripts', 'Images', 'Developers']
+const inputClass =
+  'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm transition-shadow focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/30'
 
 export default function ProjectDetail() {
   const { projectId } = useParams()
@@ -76,14 +79,10 @@ export default function ProjectDetail() {
       </Link>
 
       {isEditing ? (
-        <div className="mb-6 space-y-3 rounded-lg border border-purple-300 bg-white p-5">
+        <div className="mb-6 space-y-3 rounded-xl border border-accent-300 bg-white p-5 shadow-sm">
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Name</label>
-            <input
-              value={editName}
-              onChange={(e) => setEditName(e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
-            />
+            <input value={editName} onChange={(e) => setEditName(e.target.value)} className={inputClass} />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Description</label>
@@ -91,24 +90,17 @@ export default function ProjectDetail() {
               value={editDescription}
               onChange={(e) => setEditDescription(e.target.value)}
               rows={2}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+              className={inputClass}
             />
           </div>
           {error && <p className="text-sm text-red-600">{error}</p>}
           <div className="flex gap-2">
-            <button
-              onClick={saveEdit}
-              disabled={saving || !editName.trim()}
-              className="rounded-md bg-purple-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50"
-            >
+            <Button size="sm" onClick={saveEdit} disabled={saving || !editName.trim()}>
               {saving ? 'Saving…' : 'Save'}
-            </button>
-            <button
-              onClick={() => setIsEditing(false)}
-              className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
-            >
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => setIsEditing(false)}>
               Cancel
-            </button>
+            </Button>
           </div>
         </div>
       ) : (
@@ -141,9 +133,9 @@ export default function ProjectDetail() {
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`border-b-2 px-4 py-2 text-sm font-medium ${
+            className={`border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
               tab === t
-                ? 'border-purple-600 text-purple-700'
+                ? 'border-accent-600 text-accent-700'
                 : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
           >

@@ -4,6 +4,24 @@ import { getSignedUrl, updateManualText, deleteDocument } from '../../lib/api'
 import UploadWidget from '../../components/UploadWidget'
 import StatusBadge from '../../components/StatusBadge'
 import ConfirmDialog from '../../components/ConfirmDialog'
+import Button from '../../components/ui/Button'
+import Spinner from '../../components/ui/Spinner'
+import EmptyState from '../../components/ui/EmptyState'
+
+const inputClass =
+  'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm transition-shadow focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/30'
+
+function DocumentIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" strokeWidth={1.5} stroke="currentColor" {...props}>
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"
+      />
+    </svg>
+  )
+}
 
 /**
  * kind: 'transcripts' shows fathom/fireflies/tldv/manual documents
@@ -25,6 +43,7 @@ export default function DocumentsTab({ projectId, kind }) {
 
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState(null)
 
   useEffect(() => {
     load()
@@ -104,12 +123,13 @@ export default function DocumentsTab({ projectId, kind }) {
 
   async function confirmDelete() {
     setDeleting(true)
+    setDeleteError(null)
     try {
       await deleteDocument({ documentId: deleteTarget.id, storagePath: deleteTarget.storage_path })
       setDeleteTarget(null)
       load()
     } catch (err) {
-      alert(`Failed to delete: ${err.message}`)
+      setDeleteError(err.message)
     } finally {
       setDeleting(false)
     }
@@ -120,13 +140,18 @@ export default function DocumentsTab({ projectId, kind }) {
       <UploadWidget projectId={projectId} onUploaded={load} />
 
       {loading ? (
-        <p className="text-sm text-slate-500">Loading…</p>
+        <div className="py-10 text-center text-sm text-slate-400">
+          <Spinner label="Loading…" />
+        </div>
       ) : documents.length === 0 ? (
-        <p className="text-sm text-slate-500">No {kind} uploaded yet.</p>
+        <EmptyState icon={DocumentIcon} title={`No ${kind} uploaded yet`} description="Use the panel above to upload or paste content." />
       ) : kind === 'images' ? (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
           {documents.map((doc) => (
-            <div key={doc.id} className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+            <div
+              key={doc.id}
+              className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md"
+            >
               {thumbnails[doc.id] ? (
                 <img
                   src={thumbnails[doc.id]}
@@ -158,7 +183,7 @@ export default function DocumentsTab({ projectId, kind }) {
           ))}
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
               <tr>
@@ -216,7 +241,7 @@ export default function DocumentsTab({ projectId, kind }) {
           onClick={() => setViewingDoc(null)}
         >
           <div
-            className="max-h-[80vh] w-full max-w-2xl overflow-auto rounded-lg bg-white p-5 shadow-lg"
+            className="max-h-[80vh] w-full max-w-2xl animate-fade-in overflow-auto rounded-xl bg-white p-5 shadow-2xl shadow-slate-900/20"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-3 flex items-start justify-between">
@@ -242,7 +267,7 @@ export default function DocumentsTab({ projectId, kind }) {
           onClick={() => setEditingDoc(null)}
         >
           <div
-            className="w-full max-w-2xl rounded-lg bg-white p-5 shadow-lg"
+            className="w-full max-w-2xl animate-fade-in rounded-xl bg-white p-5 shadow-2xl shadow-slate-900/20"
             onClick={(e) => e.stopPropagation()}
           >
             <h2 className="mb-3 text-sm font-semibold text-slate-900">Edit pasted text</h2>
@@ -250,32 +275,20 @@ export default function DocumentsTab({ projectId, kind }) {
               value={editLabel}
               onChange={(e) => setEditLabel(e.target.value)}
               placeholder="Label"
-              className="mb-3 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+              className={`mb-3 ${inputClass}`}
             />
-            <textarea
-              value={editText}
-              onChange={(e) => setEditText(e.target.value)}
-              rows={10}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
-            />
+            <textarea value={editText} onChange={(e) => setEditText(e.target.value)} rows={10} className={inputClass} />
             <p className="mt-2 text-xs text-slate-400">
               Saving re-embeds this document from scratch — existing chunks are cleared and status resets to pending.
             </p>
             {editError && <p className="mt-2 text-sm text-red-600">{editError}</p>}
             <div className="mt-4 flex gap-2">
-              <button
-                onClick={saveEdit}
-                disabled={saving || !editText.trim()}
-                className="rounded-md bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50"
-              >
+              <Button onClick={saveEdit} disabled={saving || !editText.trim()}>
                 {saving ? 'Saving…' : 'Save & re-embed'}
-              </button>
-              <button
-                onClick={() => setEditingDoc(null)}
-                className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
-              >
+              </Button>
+              <Button variant="secondary" onClick={() => setEditingDoc(null)}>
                 Cancel
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -291,8 +304,12 @@ export default function DocumentsTab({ projectId, kind }) {
         confirmLabel="Delete"
         danger
         busy={deleting}
+        error={deleteError}
         onConfirm={confirmDelete}
-        onCancel={() => setDeleteTarget(null)}
+        onCancel={() => {
+          setDeleteTarget(null)
+          setDeleteError(null)
+        }}
       />
     </div>
   )
