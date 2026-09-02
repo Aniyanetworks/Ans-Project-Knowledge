@@ -44,10 +44,19 @@ export default function ProjectChat() {
     if (!question || asking) return
 
     setInput('')
-    setError(null)
     setMessages((m) => [...m, { id: `local-q-${Date.now()}`, role: 'user', content: question }])
-    setAsking(true)
+    await runAsk(question)
+  }
 
+  async function handleRetry(failedMessageId, question) {
+    if (asking) return
+    setMessages((m) => m.filter((msg) => msg.id !== failedMessageId))
+    await runAsk(question)
+  }
+
+  async function runAsk(question) {
+    setError(null)
+    setAsking(true)
     try {
       const result = await askQuestion({ projectId, question, userId: user.id })
       setMessages((m) => [
@@ -63,12 +72,20 @@ export default function ProjectChat() {
       setError(err.message)
       setMessages((m) => [
         ...m,
-        { id: `local-err-${Date.now()}`, role: 'assistant', content: `⚠️ ${err.message}`, isError: true },
+        {
+          id: `local-err-${Date.now()}`,
+          role: 'assistant',
+          content: `⚠️ ${err.message}`,
+          isError: true,
+          question,
+        },
       ])
     } finally {
       setAsking(false)
     }
   }
+
+  const lastErrorMessage = [...messages].reverse().find((m) => m.isError)
 
   return (
     <div className="mx-auto flex h-[calc(100vh-64px)] max-w-4xl flex-col px-6 py-6">
@@ -94,6 +111,15 @@ export default function ProjectChat() {
             >
               <p className="whitespace-pre-wrap">{m.content}</p>
               {m.role === 'assistant' && !m.isError && <SourceCitations sources={m.sources} />}
+              {m.isError && (
+                <button
+                  onClick={() => handleRetry(m.id, m.question)}
+                  disabled={asking}
+                  className="mt-2 text-xs font-medium text-red-700 underline hover:no-underline disabled:opacity-50"
+                >
+                  Retry
+                </button>
+              )}
             </div>
           </div>
         ))}
@@ -105,7 +131,20 @@ export default function ProjectChat() {
         <div ref={bottomRef} />
       </div>
 
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      {error && (
+        <p className="mt-2 text-sm text-red-600">
+          {error}
+          {lastErrorMessage && (
+            <button
+              onClick={() => handleRetry(lastErrorMessage.id, lastErrorMessage.question)}
+              disabled={asking}
+              className="ml-2 font-medium underline hover:no-underline disabled:opacity-50"
+            >
+              Retry
+            </button>
+          )}
+        </p>
+      )}
 
       <form onSubmit={handleSend} className="mt-4 flex gap-2">
         <input
