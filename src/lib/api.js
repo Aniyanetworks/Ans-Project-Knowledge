@@ -121,18 +121,19 @@ export async function triggerIngest(documentId) {
 /**
  * Ask a question about a project. Calls the n8n Q&A webhook, which embeds the
  * question, runs vector search scoped to the project, calls the LLM, writes
- * qa_history, and returns the answer + source citations. `imagePath`, if given,
- * is analyzed inline (vision) as context for this one answer — it is not added
- * to the project's permanent knowledge base.
+ * qa_history, and returns the answer + source citations. `imagePaths`, if given
+ * (up to 5 — extras are dropped server-side), are each analyzed inline (vision)
+ * as context for this one answer — they are not added to the project's
+ * permanent knowledge base.
  */
-export async function askQuestion({ projectId, question, userId, imagePath }) {
+export async function askQuestion({ projectId, question, userId, imagePaths }) {
   if (!QA_WEBHOOK_URL) {
     throw new Error('VITE_N8N_QA_WEBHOOK_URL is not set.')
   }
   const res = await fetch(QA_WEBHOOK_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ project_id: projectId, question, user_id: userId, image_path: imagePath }),
+    body: JSON.stringify({ project_id: projectId, question, user_id: userId, image_paths: imagePaths }),
   })
   if (!res.ok) {
     throw new Error(`Q&A request failed: ${res.status} ${await res.text()}`)

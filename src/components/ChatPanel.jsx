@@ -8,6 +8,8 @@ import Spinner from './ui/Spinner'
 import EmptyState from './ui/EmptyState'
 import ConfirmDialog from './ConfirmDialog'
 
+const MAX_IMAGES = 5 // matches the cap enforced server-side in the Q&A workflow
+
 function ImageIcon(props) {
   return (
     <svg viewBox="0 0 24 24" fill="none" strokeWidth={1.75} stroke="currentColor" {...props}>
@@ -46,10 +48,12 @@ function ChatBubbleIcon(props) {
 
 const X_ICON_PATH = 'M6 18L18 6M6 6l12 12'
 
+let attachmentIdCounter = 0
+
 /**
- * The reusable Q&A chat UI: history, ask/retry/delete/reset, image attach.
- * Used both by the developer's full-page chat route and the admin's "Chat"
- * tab on a project (so admins can test Q&A without a separate dev account).
+ * The reusable Q&A chat UI: history, ask/retry/delete/reset, multi-image attach.
+ * Used both by the developer's full-page chat route and the admin's "Test" tab
+ * on a project (so admins can test Q&A without a separate dev account).
  *
  * `heightClassName` lets the two call sites size it differently — the
  * standalone page uses full viewport height, the admin tab uses a fixed height
@@ -57,12 +61,12 @@ const X_ICON_PATH = 'M6 18L18 6M6 6l12 12'
  */
 export default function ChatPanel({ projectId, heightClassName = 'h-[calc(100vh-64px)]' }) {
   const { user } = useAuth()
-  const [messages, setMessages] = useState([]) // [{ id, role, content, sources, isError, question, imageUrl }]
+  const [messages, setMessages] = useState([]) // [{ id, role, content, sources, isError, question, imageUrls }]
   const [input, setInput] = useState('')
   const [asking, setAsking] = useState(false)
   const [error, setError] = useState(null)
-  const [attachedImage, setAttachedImage] = useState(null)
-  const [attachedImagePreview, setAttachedImagePreview] = useState(null)
+  const [attachments, setAttachments] = useState([]) // [{ id, file, previewUrl }]
+  const [attachError, setAttachError] = useState(null)
   const [confirmingReset, setConfirmingReset] = useState(false)
   const [resetting, setResetting] = useState(false)
   const bottomRef = useRef(null)
@@ -96,34 +100,48 @@ export default function ChatPanel({ projectId, heightClassName = 'h-[calc(100vh-
     setMessages(historyMessages)
   }
 
-  function handlePickImage(file) {
-    if (!file) return
-    setAttachedImage(file)
-    setAttachedImagePreview((prev) => {
-      if (prev) URL.revokeObjectURL(prev)
-      return URL.createObjectURL(file)
+  function handlePickImages(fileList) {
+    const files = Array.from(fileList || []).filter((f) => f.type.startsWith('image/'))
+    if (files.length === 0) return
+    setAttachError(null)
+    setAttachments((prev) => {
+      const room = MAX_IMAGES - prev.length
+      if (room <= 0) {
+        setAttachError(`You can attach up to ${MAX_IMAGES} images.`)
+        return prev
+      }
+      const accepted = files.slice(0, room)
+      if (files.length > accepted.length) {
+        setAttachError(`Only added ${accepted.length} — you can attach up to ${MAX_IMAGES} images.`)
+      }
+      const next = accepted.map((file) => ({
+        id: `att-${attachmentIdCounter++}`,
+        file,
+        previewUrl: URL.createObjectURL(file),
+      }))
+      return [...prev, ...next]
     })
   }
 
   function handlePaste(e) {
     const items = e.clipboardData?.items
     if (!items) return
-    for (const item of items) {
-      if (item.type.startsWith('image/')) {
-        e.preventDefault() // don't also paste a filename/garbage into the text input
-        handlePickImage(item.getAsFile())
-        return
-      }
+    const imageFiles = Array.from(items)
+      .filter((item) => item.type.startsWith('image/'))
+      .map((item) => item.getAsFile())
+      .filter(Boolean)
+    if (imageFiles.length > 0) {
+      e.preventDefault() // don't also paste a filename/garbage into the text input
+      handlePickImages(imageFiles)
     }
   }
 
-  function clearAttachedImage() {
-    setAttachedImagePreview((prev) => {
-      if (prev) URL.revokeObjectURL(prev)
-      return null
+  function removeAttachment(id) {
+    setAttachments((prev) => {
+      const target = prev.find((a) => a.id === id)
+      if (target) URL.revokeObjectURL(target.previewUrl)
+      return prev.filter((a) => a.id !== id)
     })
-    setAttachedImage(null)
-    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   async function handleSend(e) {
@@ -131,21 +149,23 @@ export default function ChatPanel({ projectId, heightClassName = 'h-[calc(100vh-
     const question = input.trim()
     if (!question || asking) return
 
-    const imageToSend = attachedImage
-    const imagePreviewToShow = attachedImagePreview
+    const attachmentsToSend = attachments
     setInput('')
-    // Note: NOT calling clearAttachedImage() here — it revokes the object URL,
-    // which would break the image once it's shown in the message bubble below.
-    // The "remove attachment" button (clearAttachedImage) still revokes correctly
-    // for the case where an attachment is discarded before ever being sent.
-    setAttachedImage(null)
-    setAttachedImagePreview(null)
+    // Note: NOT revoking the preview URLs here — they're about to be shown in the
+    // message bubble below. They're only revoked when explicitly removed pre-send.
+    setAttachments([])
+    setAttachError(null)
     if (fileInputRef.current) fileInputRef.current.value = ''
     setMessages((m) => [
       ...m,
-      { id: `local-q-${Date.now()}`, role: 'user', content: question, imageUrl: imagePreviewToShow },
+      {
+        id: `local-q-${Date.now()}`,
+        role: 'user',
+        content: question,
+        imageUrls: attachmentsToSend.map((a) => a.previewUrl),
+      },
     ])
-    await runAsk(question, imageToSend)
+    await runAsk(question, attachmentsToSend)
   }
 
   async function handleRetry(failedMessageId, question) {
@@ -154,15 +174,17 @@ export default function ChatPanel({ projectId, heightClassName = 'h-[calc(100vh-
     await runAsk(question)
   }
 
-  async function runAsk(question, imageFile) {
+  async function runAsk(question, attachmentsToSend = []) {
     setError(null)
     setAsking(true)
     try {
-      let imagePath
-      if (imageFile) {
-        imagePath = await uploadChatImage({ projectId, file: imageFile })
+      let imagePaths
+      if (attachmentsToSend.length > 0) {
+        imagePaths = await Promise.all(
+          attachmentsToSend.map((a) => uploadChatImage({ projectId, file: a.file }))
+        )
       }
-      const result = await askQuestion({ projectId, question, userId: user.id, imagePath })
+      const result = await askQuestion({ projectId, question, userId: user.id, imagePaths })
       setMessages((m) => [
         ...m,
         {
@@ -251,8 +273,17 @@ export default function ChatPanel({ projectId, heightClassName = 'h-[calc(100vh-
                   : 'bg-slate-100 text-slate-800'
               }`}
             >
-              {m.imageUrl && (
-                <img src={m.imageUrl} alt="Attached" className="mb-2 max-h-48 rounded-lg object-cover" />
+              {m.imageUrls && m.imageUrls.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-1.5">
+                  {m.imageUrls.map((url, i) => (
+                    <img
+                      key={i}
+                      src={url}
+                      alt="Attached"
+                      className="h-20 w-20 rounded-lg object-cover"
+                    />
+                  ))}
+                </div>
               )}
               <p className="whitespace-pre-wrap">{m.content}</p>
               {m.role === 'assistant' && !m.isError && <SourceCitations sources={m.sources} />}
@@ -302,37 +333,51 @@ export default function ChatPanel({ projectId, heightClassName = 'h-[calc(100vh-
         </p>
       )}
 
-      {attachedImagePreview && (
-        <div className="mt-3 flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-2 shadow-sm">
-          <img src={attachedImagePreview} alt="Attachment preview" className="h-10 w-10 rounded object-cover" />
-          <span className="flex-1 truncate text-xs text-slate-500">{attachedImage?.name}</span>
-          <button
-            onClick={clearAttachedImage}
-            className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-            aria-label="Remove attached image"
-          >
-            <svg viewBox="0 0 24 24" fill="none" strokeWidth={2} stroke="currentColor" className="h-4 w-4">
-              <path strokeLinecap="round" strokeLinejoin="round" d={X_ICON_PATH} />
-            </svg>
-          </button>
+      {attachments.length > 0 && (
+        <div className="mt-3 flex gap-2 overflow-x-auto rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+          {attachments.map((a) => (
+            <div key={a.id} className="group/thumb relative h-16 w-16 shrink-0">
+              <div className="h-full w-full overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
+                <img
+                  src={a.previewUrl}
+                  alt=""
+                  className="h-full w-full object-cover"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none'
+                  }}
+                />
+              </div>
+              <button
+                onClick={() => removeAttachment(a.id)}
+                className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 shadow-sm hover:text-red-500"
+                aria-label="Remove attached image"
+              >
+                <svg viewBox="0 0 24 24" fill="none" strokeWidth={2.5} stroke="currentColor" className="h-3 w-3">
+                  <path strokeLinecap="round" strokeLinejoin="round" d={X_ICON_PATH} />
+                </svg>
+              </button>
+            </div>
+          ))}
         </div>
       )}
+      {attachError && <p className="mt-2 text-xs text-amber-600">{attachError}</p>}
 
       <form onSubmit={handleSend} className="mt-4 flex gap-2">
         <input
           ref={fileInputRef}
           type="file"
           accept="image/*"
+          multiple
           className="hidden"
-          onChange={(e) => handlePickImage(e.target.files?.[0])}
+          onChange={(e) => handlePickImages(e.target.files)}
         />
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          disabled={asking}
+          disabled={asking || attachments.length >= MAX_IMAGES}
           className="flex shrink-0 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-slate-500 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-700 disabled:opacity-50"
-          aria-label="Attach an image"
-          title="Attach an image"
+          aria-label="Attach images"
+          title={`Attach images (up to ${MAX_IMAGES})`}
         >
           <ImageIcon className="h-4.5 w-4.5" />
         </button>
