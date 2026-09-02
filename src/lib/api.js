@@ -2,6 +2,7 @@ import { supabase } from './supabaseClient'
 
 const INGEST_WEBHOOK_URL = import.meta.env.VITE_N8N_INGEST_WEBHOOK_URL
 const QA_WEBHOOK_URL = import.meta.env.VITE_N8N_QA_WEBHOOK_URL
+const INVITE_WEBHOOK_URL = import.meta.env.VITE_N8N_INVITE_WEBHOOK_URL
 
 const STORAGE_BUCKET = 'project-files'
 
@@ -166,6 +167,30 @@ export async function resetChatHistory({ projectId, userId }) {
     .eq('project_id', projectId)
     .eq('user_id', userId)
   if (error) throw error
+}
+
+/**
+ * Creates a new developer account via the n8n workflow (which uses the
+ * Supabase service_role key server-side — this can't run in the browser).
+ * Two modes, both returning a user_id whose `profiles` row already exists
+ * (created by the signup trigger) so access can be granted immediately:
+ *  - `password` omitted: Supabase sends an invite email with a sign-in link.
+ *  - `password` given: account is created and usable immediately, no email sent.
+ */
+export async function inviteDeveloper({ email, password, invitedBy }) {
+  if (!INVITE_WEBHOOK_URL) {
+    throw new Error('VITE_N8N_INVITE_WEBHOOK_URL is not set.')
+  }
+  const res = await fetch(INVITE_WEBHOOK_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password, invited_by: invitedBy }),
+  })
+  const body = await res.json().catch(() => ({}))
+  if (!res.ok || body.success === false) {
+    throw new Error(body.error || `Invite failed: ${res.status}`)
+  }
+  return body // { success: true, user_id, email }
 }
 
 /** Signed URL for viewing/downloading a private storage object (default 1hr expiry). */

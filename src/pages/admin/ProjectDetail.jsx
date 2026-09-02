@@ -5,8 +5,9 @@ import DocumentsTab from './DocumentsTab'
 import DevelopersTab from './DevelopersTab'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import Button from '../../components/ui/Button'
+import ChatPanel from '../../components/ChatPanel'
 
-const TABS = ['Transcripts', 'Images', 'Developers']
+const TABS = ['Transcripts', 'Images', 'Developers', 'Chat']
 const inputClass =
   'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm transition-shadow focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/30'
 
@@ -147,6 +148,15 @@ export default function ProjectDetail() {
       {tab === 'Transcripts' && <DocumentsTab projectId={projectId} kind="transcripts" />}
       {tab === 'Images' && <DocumentsTab projectId={projectId} kind="images" />}
       {tab === 'Developers' && <DevelopersTab projectId={projectId} />}
+      {tab === 'Chat' && (
+        <>
+          <p className="mb-4 text-xs text-slate-400">
+            Ask questions here to test retrieval and answer quality — this doesn't affect what
+            developers see; it's your own Q&A history for this project.
+          </p>
+          <ChatPanel projectId={projectId} heightClassName="h-[600px]" />
+        </>
+      )}
 
       <ConfirmDialog
         open={confirmingDelete}
