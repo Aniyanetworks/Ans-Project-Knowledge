@@ -78,10 +78,15 @@ export default function ChatPanel({ projectId, heightClassName = 'h-[calc(100vh-
   }, [messages, asking])
 
   async function loadHistory() {
+    // Explicitly scope by user_id, not just project_id — RLS enforces this for
+    // developers anyway, but admins bypass RLS entirely (full-access policy), so
+    // without this filter an admin using this same panel would see every
+    // developer's history mixed into their own.
     const { data, error } = await supabase
       .from('qa_history')
       .select('*')
       .eq('project_id', projectId)
+      .eq('user_id', user.id)
       .order('created_at', { ascending: true })
     if (error) return
     const historyMessages = (data ?? []).flatMap((qa) => [
