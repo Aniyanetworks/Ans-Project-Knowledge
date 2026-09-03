@@ -222,7 +222,7 @@ export default function DocumentsTab({ projectId, kind }) {
                       <button onClick={() => handleView(doc)} className="text-xs text-slate-400 hover:text-slate-600">
                         View
                       </button>
-                      {doc.source_type === 'manual' && (
+                      {doc.raw_text && (
                         <button onClick={() => startEdit(doc)} className="text-xs text-slate-400 hover:text-slate-600">
                           Edit
                         </button>

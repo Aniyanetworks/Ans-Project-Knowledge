@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../contexts/AuthContext'
-import { inviteDeveloper } from '../../lib/api'
+import { inviteDeveloper, deleteDeveloperAccount, resetUserPassword } from '../../lib/api'
 import Spinner from '../../components/ui/Spinner'
 import EmptyState from '../../components/ui/EmptyState'
 import Button from '../../components/ui/Button'
+import ConfirmDialog from '../../components/ConfirmDialog'
 
 const inputClass =
   'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm transition-shadow focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/30'
@@ -28,6 +29,83 @@ function generatePassword() {
   return base.slice(0, 12) + '!A1'
 }
 
+function ResetPasswordModal({ developer, onClose, onDone }) {
+  const [password, setPassword] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState(null)
+  const [success, setSuccess] = useState(false)
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    if (password.trim().length < 8) {
+      setError('Password must be at least 8 characters.')
+      return
+    }
+    setSaving(true)
+    setError(null)
+    try {
+      await resetUserPassword({ userId: developer.id, password: password.trim() })
+      setSuccess(true)
+      onDone?.()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 backdrop-blur-[2px]"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-sm animate-fade-in rounded-xl bg-white p-5 shadow-2xl shadow-slate-900/20"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 className="mb-1 text-base font-semibold text-slate-900">Reset password</h2>
+        <p className="mb-4 text-sm text-slate-500">
+          For <strong>{developer.full_name || developer.email}</strong> — sets it directly, no email sent.
+        </p>
+        {success ? (
+          <>
+            <p className="mb-4 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">
+              Password updated to <strong>{password.trim()}</strong> — copy this now, it won't be shown again.
+            </p>
+            <Button variant="secondary" size="sm" onClick={onClose}>
+              Close
+            </Button>
+          </>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-3">
+            <div className="flex gap-2">
+              <input
+                autoFocus
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="New password (min. 8 characters)"
+                className={inputClass}
+              />
+              <Button type="button" variant="secondary" size="sm" onClick={() => setPassword(generatePassword())}>
+                Generate
+              </Button>
+            </div>
+            {error && <p className="text-sm text-red-600">{error}</p>}
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="secondary" size="sm" onClick={onClose} disabled={saving}>
+                Cancel
+              </Button>
+              <Button type="submit" size="sm" disabled={saving || !password}>
+                {saving ? 'Saving…' : 'Update password'}
+              </Button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function DevelopersTab({ projectId }) {
   const { user } = useAuth()
   const [developers, setDevelopers] = useState([])
@@ -42,6 +120,11 @@ export default function DevelopersTab({ projectId }) {
   const [inviting, setInviting] = useState(false)
   const [inviteError, setInviteError] = useState(null)
   const [inviteSuccess, setInviteSuccess] = useState(null)
+
+  const [resetTarget, setResetTarget] = useState(null)
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState(null)
 
   useEffect(() => {
     load()
@@ -106,6 +189,20 @@ export default function DevelopersTab({ projectId }) {
       setInviteError(err.message)
     } finally {
       setInviting(false)
+    }
+  }
+
+  async function confirmDeleteAccount() {
+    setDeleting(true)
+    setDeleteError(null)
+    try {
+      await deleteDeveloperAccount(deleteTarget.id)
+      setDeleteTarget(null)
+      load()
+    } catch (err) {
+      setDeleteError(err.message)
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -217,29 +314,69 @@ export default function DevelopersTab({ projectId }) {
             {developers.map((dev) => {
               const hasAccess = accessUserIds.has(dev.id)
               return (
-                <li key={dev.id} className="flex items-center justify-between px-4 py-3">
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-500">
+                <li key={dev.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-500">
                       {(dev.full_name || dev.email).charAt(0).toUpperCase()}
                     </span>
-                    <div>
-                      <p className="text-sm font-medium text-slate-800">{dev.full_name || dev.email}</p>
-                      <p className="text-xs text-slate-500">{dev.email}</p>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-slate-800">{dev.full_name || dev.email}</p>
+                      <p className="truncate text-xs text-slate-500">{dev.email}</p>
                     </div>
                   </div>
-                  <Button
-                    size="sm"
-                    variant={hasAccess ? 'secondary' : 'primary'}
-                    onClick={() => toggleAccess(dev.id, hasAccess)}
-                  >
-                    {hasAccess ? 'Revoke access' : 'Grant access'}
-                  </Button>
+                  <div className="flex shrink-0 items-center gap-3">
+                    <button
+                      onClick={() => setResetTarget(dev)}
+                      className="text-xs text-slate-400 hover:text-slate-600"
+                    >
+                      Reset password
+                    </button>
+                    <button
+                      onClick={() => {
+                        setDeleteTarget(dev)
+                        setDeleteError(null)
+                      }}
+                      className="text-xs text-red-400 hover:text-red-600"
+                    >
+                      Delete account
+                    </button>
+                    <Button
+                      size="sm"
+                      variant={hasAccess ? 'secondary' : 'primary'}
+                      onClick={() => toggleAccess(dev.id, hasAccess)}
+                    >
+                      {hasAccess ? 'Revoke access' : 'Grant access'}
+                    </Button>
+                  </div>
                 </li>
               )
             })}
           </ul>
         )}
       </div>
+
+      {resetTarget && (
+        <ResetPasswordModal
+          developer={resetTarget}
+          onClose={() => setResetTarget(null)}
+          onDone={() => {}}
+        />
+      )}
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Delete developer account?"
+        message={
+          deleteTarget &&
+          `Permanently delete "${deleteTarget.full_name || deleteTarget.email}"'s account? This removes their access to every project (not just this one) and their Q&A history. This cannot be undone.`
+        }
+        confirmLabel="Delete account"
+        danger
+        busy={deleting}
+        error={deleteError}
+        onConfirm={confirmDeleteAccount}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   )
 }

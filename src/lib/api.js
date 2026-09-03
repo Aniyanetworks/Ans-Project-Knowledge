@@ -38,14 +38,18 @@ export async function uploadFileDocument({ projectId, file, sourceType, userId }
 }
 
 /**
- * Insert a `documents` row for manually pasted text (no file), then notify n8n.
+ * Insert a `documents` row for pasted text (no file), then notify n8n. Used for
+ * manual paste, and also for Fathom/Fireflies/tl;dv transcripts pasted directly
+ * as text rather than uploaded as an export file — `sourceType` preserves which
+ * so `Parse Transcript` in the ingestion workflow still knows which format to
+ * expect, and the UI still shows the right source label.
  */
-export async function submitManualText({ projectId, text, userId, label }) {
+export async function submitManualText({ projectId, text, userId, label, sourceType = 'manual' }) {
   const { data: doc, error: insertError } = await supabase
     .from('documents')
     .insert({
       project_id: projectId,
-      source_type: 'manual',
+      source_type: sourceType,
       original_filename: label || 'Pasted text',
       raw_text: text,
       uploaded_by: userId,
@@ -179,19 +183,42 @@ export async function resetChatHistory({ projectId, userId }) {
  *  - `password` given: account is created and usable immediately, no email sent.
  */
 export async function inviteDeveloper({ email, password, invitedBy }) {
+  return callUserManagementWebhook({ action: 'invite', email, password, invited_by: invitedBy })
+}
+
+/**
+ * Permanently deletes a developer's account (auth.users row — profiles and
+ * project_access cascade via FK). This is irreversible and distinct from
+ * revoking a project's access grant, which only removes one project's access.
+ */
+export async function deleteDeveloperAccount(userId) {
+  return callUserManagementWebhook({ action: 'delete', user_id: userId })
+}
+
+/**
+ * Admin-initiated password reset for another user (developer or admin) — sets
+ * the password directly, no email involved. For a user changing their OWN
+ * password, use `supabase.auth.updateUser({ password })` directly instead
+ * (works client-side, no service role needed).
+ */
+export async function resetUserPassword({ userId, password }) {
+  return callUserManagementWebhook({ action: 'reset_password', user_id: userId, password })
+}
+
+async function callUserManagementWebhook(payload) {
   if (!INVITE_WEBHOOK_URL) {
     throw new Error('VITE_N8N_INVITE_WEBHOOK_URL is not set.')
   }
   const res = await fetch(INVITE_WEBHOOK_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password, invited_by: invitedBy }),
+    body: JSON.stringify(payload),
   })
   const body = await res.json().catch(() => ({}))
   if (!res.ok || body.success === false) {
-    throw new Error(body.error || `Invite failed: ${res.status}`)
+    throw new Error(body.error || `Request failed: ${res.status}`)
   }
-  return body // { success: true, user_id, email }
+  return body
 }
 
 /** Signed URL for viewing/downloading a private storage object (default 1hr expiry). */

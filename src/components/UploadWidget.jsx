@@ -7,12 +7,15 @@ import Spinner from './ui/Spinner'
 const inputClass =
   'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm transition-shadow focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/30'
 
+// `pasteDefault` matters for source types where both an uploaded export file and a
+// copy-pasted transcript are plausible — Fathom in particular is commonly copy-pasted
+// as text rather than downloaded as a file, so it defaults to paste mode.
 const SOURCE_TYPES = [
-  { value: 'fathom', label: 'Fathom export' },
-  { value: 'fireflies', label: 'Fireflies export' },
-  { value: 'tldv', label: 'tl;dv export' },
-  { value: 'manual', label: 'Manual paste' },
-  { value: 'image', label: 'Image' },
+  { value: 'fathom', label: 'Fathom export', supportsPaste: true, pasteDefault: true },
+  { value: 'fireflies', label: 'Fireflies export', supportsPaste: true, pasteDefault: false },
+  { value: 'tldv', label: 'tl;dv export', supportsPaste: true, pasteDefault: false },
+  { value: 'manual', label: 'Manual paste', supportsPaste: true, pasteDefault: true, pasteOnly: true },
+  { value: 'image', label: 'Image', supportsPaste: false },
 ]
 
 function UploadIcon(props) {
@@ -30,6 +33,7 @@ function UploadIcon(props) {
 export default function UploadWidget({ projectId, onUploaded }) {
   const { user } = useAuth()
   const [sourceType, setSourceType] = useState('fathom')
+  const [pasteMode, setPasteMode] = useState(true) // matches fathom's pasteDefault above
   const [dragOver, setDragOver] = useState(false)
   const [pasteText, setPasteText] = useState('')
   const [pasteLabel, setPasteLabel] = useState('')
@@ -37,7 +41,14 @@ export default function UploadWidget({ projectId, onUploaded }) {
   const [error, setError] = useState(null)
   const inputRef = useRef(null)
 
-  const isManualPaste = sourceType === 'manual'
+  const sourceConfig = SOURCE_TYPES.find((t) => t.value === sourceType)
+  const showPasteForm = sourceConfig.pasteOnly || pasteMode
+
+  function handleSourceTypeChange(value) {
+    setSourceType(value)
+    const config = SOURCE_TYPES.find((t) => t.value === value)
+    setPasteMode(config.pasteDefault ?? false)
+  }
 
   async function handleFiles(files) {
     if (!files || files.length === 0) return
@@ -60,7 +71,7 @@ export default function UploadWidget({ projectId, onUploaded }) {
     setBusy(true)
     setError(null)
     try {
-      await submitManualText({ projectId, text: pasteText, label: pasteLabel, userId: user.id })
+      await submitManualText({ projectId, text: pasteText, label: pasteLabel, userId: user.id, sourceType })
       setPasteText('')
       setPasteLabel('')
       onUploaded?.()
@@ -73,22 +84,47 @@ export default function UploadWidget({ projectId, onUploaded }) {
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="mb-4">
-        <label className="mb-1 block text-sm font-medium text-slate-700">Source type</label>
-        <select
-          value={sourceType}
-          onChange={(e) => setSourceType(e.target.value)}
-          className={`max-w-xs ${inputClass}`}
-        >
-          {SOURCE_TYPES.map((t) => (
-            <option key={t.value} value={t.value}>
-              {t.label}
-            </option>
-          ))}
-        </select>
+      <div className="mb-4 flex flex-wrap items-end gap-4">
+        <div>
+          <label className="mb-1 block text-sm font-medium text-slate-700">Source type</label>
+          <select
+            value={sourceType}
+            onChange={(e) => handleSourceTypeChange(e.target.value)}
+            className={`max-w-xs ${inputClass}`}
+          >
+            {SOURCE_TYPES.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {sourceConfig.supportsPaste && !sourceConfig.pasteOnly && (
+          <div className="inline-flex rounded-lg border border-slate-200 p-0.5">
+            <button
+              type="button"
+              onClick={() => setPasteMode(false)}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                !pasteMode ? 'bg-accent-600 text-white' : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              Upload file
+            </button>
+            <button
+              type="button"
+              onClick={() => setPasteMode(true)}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                pasteMode ? 'bg-accent-600 text-white' : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              Paste text
+            </button>
+          </div>
+        )}
       </div>
 
-      {isManualPaste ? (
+      {showPasteForm ? (
         <div className="space-y-3">
           <input
             value={pasteLabel}

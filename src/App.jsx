@@ -5,7 +5,6 @@ import Navbar from './components/Navbar'
 import LoginPage from './pages/LoginPage'
 import AdminDashboard from './pages/admin/AdminDashboard'
 import ProjectDetail from './pages/admin/ProjectDetail'
-import SettingsPage from './pages/admin/SettingsPage'
 import DeveloperDashboard from './pages/developer/DeveloperDashboard'
 import ProjectChat from './pages/developer/ProjectChat'
 
@@ -61,17 +60,6 @@ export default function App() {
               </ProtectedRoute>
             }
           />
-          <Route
-            path="/admin/settings"
-            element={
-              <ProtectedRoute requireRole="admin">
-                <Layout>
-                  <SettingsPage />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-
           <Route
             path="/developer"
             element={

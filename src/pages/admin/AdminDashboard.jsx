@@ -6,9 +6,12 @@ import ConfirmDialog from '../../components/ConfirmDialog'
 import Button from '../../components/ui/Button'
 import Spinner from '../../components/ui/Spinner'
 import EmptyState from '../../components/ui/EmptyState'
+import RestrictedTopicsTab from './RestrictedTopicsTab'
 
 const inputClass =
   'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm transition-shadow focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/30'
+
+const TABS = ['Projects', 'Restricted Topics']
 
 function FolderPlusIcon(props) {
   return (
@@ -38,6 +41,7 @@ export default function AdminDashboard() {
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState(null)
   const [confirmTarget, setConfirmTarget] = useState(null)
+  const [tab, setTab] = useState('Projects')
 
   useEffect(() => {
     loadProjects()
@@ -123,15 +127,35 @@ export default function AdminDashboard() {
     <div className="mx-auto max-w-6xl px-6 py-8">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Projects</h1>
-          <p className="mt-0.5 text-sm text-slate-500">Manage projects and their knowledge sources.</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Admin</h1>
+          <p className="mt-0.5 text-sm text-slate-500">Manage projects and configuration that applies across all of them.</p>
         </div>
-        <Button variant={showForm ? 'secondary' : 'primary'} onClick={() => setShowForm((s) => !s)}>
-          {showForm ? 'Cancel' : '+ New project'}
-        </Button>
+        {tab === 'Projects' && (
+          <Button variant={showForm ? 'secondary' : 'primary'} onClick={() => setShowForm((s) => !s)}>
+            {showForm ? 'Cancel' : '+ New project'}
+          </Button>
+        )}
       </div>
 
-      {showForm && (
+      <div className="mb-6 flex gap-1 border-b border-slate-200">
+        {TABS.map((t) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={`border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
+              tab === t
+                ? 'border-accent-600 text-accent-700'
+                : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            {t}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'Restricted Topics' && <RestrictedTopicsTab />}
+
+      {tab === 'Projects' && showForm && (
         <form
           onSubmit={handleCreate}
           className="mb-8 space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
@@ -156,7 +180,7 @@ export default function AdminDashboard() {
         </form>
       )}
 
-      {loading ? (
+      {tab === 'Projects' && (loading ? (
         <div className="py-16 text-center text-sm text-slate-400">
           <Spinner label="Loading projects…" />
         </div>
@@ -230,7 +254,7 @@ export default function AdminDashboard() {
             )
           )}
         </div>
-      )}
+      ))}
 
       <ConfirmDialog
         open={!!confirmTarget}

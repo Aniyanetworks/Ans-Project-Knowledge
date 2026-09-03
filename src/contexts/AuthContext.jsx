@@ -70,6 +70,12 @@ export function AuthProvider({ children }) {
     await supabase.auth.signOut()
   }
 
+  /** Changes the CURRENT user's own password — works client-side, no service role needed. */
+  async function changeOwnPassword(newPassword) {
+    const { error } = await supabase.auth.updateUser({ password: newPassword })
+    if (error) throw error
+  }
+
   const value = {
     session,
     user: session?.user ?? null,
@@ -80,6 +86,7 @@ export function AuthProvider({ children }) {
     signInWithPassword,
     signInWithMagicLink,
     signOut,
+    changeOwnPassword,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
