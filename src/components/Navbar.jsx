@@ -2,40 +2,9 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import Button from './ui/Button'
-
-const inputClass =
-  'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm transition-shadow focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/30'
+import ChangePasswordForm from './ChangePasswordForm'
 
 function ChangePasswordModal({ onClose }) {
-  const { changeOwnPassword } = useAuth()
-  const [password, setPassword] = useState('')
-  const [confirm, setConfirm] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState(null)
-  const [success, setSuccess] = useState(false)
-
-  async function handleSubmit(e) {
-    e.preventDefault()
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters.')
-      return
-    }
-    if (password !== confirm) {
-      setError("Passwords don't match.")
-      return
-    }
-    setSaving(true)
-    setError(null)
-    try {
-      await changeOwnPassword(password)
-      setSuccess(true)
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setSaving(false)
-    }
-  }
-
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 backdrop-blur-[2px]"
@@ -45,44 +14,10 @@ function ChangePasswordModal({ onClose }) {
         className="w-full max-w-sm animate-fade-in rounded-xl bg-white p-5 shadow-2xl shadow-slate-900/20"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="mb-4 text-base font-semibold text-slate-900">Change your password</h2>
-        {success ? (
-          <>
-            <p className="mb-4 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">
-              Password updated.
-            </p>
-            <Button variant="secondary" size="sm" onClick={onClose}>
-              Close
-            </Button>
-          </>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-3">
-            <input
-              type="password"
-              autoFocus
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="New password (min. 8 characters)"
-              className={inputClass}
-            />
-            <input
-              type="password"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              placeholder="Confirm new password"
-              className={inputClass}
-            />
-            {error && <p className="text-sm text-red-600">{error}</p>}
-            <div className="flex justify-end gap-2 pt-1">
-              <Button type="button" variant="secondary" size="sm" onClick={onClose} disabled={saving}>
-                Cancel
-              </Button>
-              <Button type="submit" size="sm" disabled={saving || !password || !confirm}>
-                {saving ? 'Saving…' : 'Update password'}
-              </Button>
-            </div>
-          </form>
-        )}
+        <ChangePasswordForm />
+        <Button variant="secondary" size="sm" className="mt-3" onClick={onClose}>
+          Close
+        </Button>
       </div>
     </div>
   )
@@ -123,12 +58,14 @@ export default function Navbar() {
             </span>
             <span className="text-sm text-slate-500">{profile?.email}</span>
           </div>
-          <button
-            onClick={() => setShowPasswordModal(true)}
-            className="text-sm text-slate-500 hover:text-slate-700"
-          >
-            Change password
-          </button>
+          {!isAdmin && (
+            <button
+              onClick={() => setShowPasswordModal(true)}
+              className="text-sm text-slate-500 hover:text-slate-700"
+            >
+              Change password
+            </button>
+          )}
           <Button variant="secondary" size="sm" onClick={handleSignOut}>
             Sign out
           </Button>

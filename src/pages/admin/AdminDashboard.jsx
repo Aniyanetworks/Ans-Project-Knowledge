@@ -7,11 +7,12 @@ import Button from '../../components/ui/Button'
 import Spinner from '../../components/ui/Spinner'
 import EmptyState from '../../components/ui/EmptyState'
 import RestrictedTopicsTab from './RestrictedTopicsTab'
+import ChangePasswordForm from '../../components/ChangePasswordForm'
 
 const inputClass =
   'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm transition-shadow focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/30'
 
-const TABS = ['Projects', 'Restricted Topics']
+const TABS = ['Projects', 'Restricted Topics', 'Change Password']
 
 function FolderPlusIcon(props) {
   return (
@@ -154,6 +155,8 @@ export default function AdminDashboard() {
       </div>
 
       {tab === 'Restricted Topics' && <RestrictedTopicsTab />}
+
+      {tab === 'Change Password' && <ChangePasswordForm />}
 
       {tab === 'Projects' && showForm && (
         <form
