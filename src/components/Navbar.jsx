@@ -26,9 +26,14 @@ export default function Navbar() {
         </Link>
         <div className="flex items-center gap-3">
           {isAdmin && (
-            <span className="rounded-full bg-accent-100 px-2.5 py-1 text-xs font-medium text-accent-700">
-              Admin
-            </span>
+            <>
+              <Link to="/admin/settings" className="text-sm text-slate-500 hover:text-slate-700">
+                Settings
+              </Link>
+              <span className="rounded-full bg-accent-100 px-2.5 py-1 text-xs font-medium text-accent-700">
+                Admin
+              </span>
+            </>
           )}
           <div className="hidden items-center gap-2 sm:flex">
             <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-200 text-[11px] font-semibold text-slate-600">
