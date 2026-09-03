@@ -353,7 +353,7 @@ export default function DevelopersTab({ projectId }) {
                       onClick={() => setResetTarget(dev)}
                       title="Reset password"
                       aria-label="Reset password"
-                      className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                      className="inline-flex items-center justify-center rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
                     >
                       <KeyIcon className="h-4 w-4" />
                     </button>
@@ -364,7 +364,7 @@ export default function DevelopersTab({ projectId }) {
                       }}
                       title="Delete account"
                       aria-label="Delete account"
-                      className="rounded-lg p-1.5 text-red-400 hover:bg-red-50 hover:text-red-600"
+                      className="inline-flex items-center justify-center rounded-lg p-1.5 text-red-400 hover:bg-red-50 hover:text-red-600"
                     >
                       <TrashIcon className="h-4 w-4" />
                     </button>
