@@ -23,6 +23,18 @@ function DocumentIcon(props) {
   )
 }
 
+function RefreshIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" strokeWidth={1.5} stroke="currentColor" {...props}>
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"
+      />
+    </svg>
+  )
+}
+
 /**
  * kind: 'transcripts' shows fathom/fireflies/tldv/manual documents
  *       'images' shows image documents (with thumbnail preview)
@@ -30,6 +42,7 @@ function DocumentIcon(props) {
 export default function DocumentsTab({ projectId, kind }) {
   const [documents, setDocuments] = useState([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [thumbnails, setThumbnails] = useState({})
 
   const [viewingDoc, setViewingDoc] = useState(null)
@@ -59,8 +72,8 @@ export default function DocumentsTab({ projectId, kind }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, kind])
 
-  async function load() {
-    setLoading(true)
+  async function load({ silent = false } = {}) {
+    if (!silent) setLoading(true)
     let query = supabase
       .from('documents')
       .select('*')
@@ -71,7 +84,7 @@ export default function DocumentsTab({ projectId, kind }) {
 
     const { data, error } = await query
     if (!error) setDocuments(data ?? [])
-    setLoading(false)
+    if (!silent) setLoading(false)
 
     if (kind === 'images') {
       const entries = await Promise.all(
@@ -81,6 +94,12 @@ export default function DocumentsTab({ projectId, kind }) {
       )
       setThumbnails(Object.fromEntries(entries))
     }
+  }
+
+  async function handleRefresh() {
+    setRefreshing(true)
+    await load({ silent: true })
+    setRefreshing(false)
   }
 
   async function handleView(doc) {
@@ -138,6 +157,19 @@ export default function DocumentsTab({ projectId, kind }) {
   return (
     <div className="space-y-6">
       <UploadWidget projectId={projectId} onUploaded={load} />
+
+      <div className="flex items-center justify-end">
+        <button
+          onClick={handleRefresh}
+          disabled={refreshing}
+          title="Refresh"
+          aria-label="Refresh"
+          className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-50"
+        >
+          <RefreshIcon className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+          Refresh
+        </button>
+      </div>
 
       {loading ? (
         <div className="py-10 text-center text-sm text-slate-400">
