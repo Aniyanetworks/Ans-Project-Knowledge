@@ -130,7 +130,12 @@ function ResetPasswordModal({ developer, onClose, onDone }) {
   )
 }
 
-export default function DevelopersTab({ projectId }) {
+/**
+ * canManageAccounts: admins can also invite new accounts, reset passwords, and
+ * delete accounts. Project owners (developers) only grant/revoke access to
+ * their own project, and don't see themselves in the list.
+ */
+export default function DevelopersTab({ projectId, canManageAccounts = true }) {
   const { user } = useAuth()
   const [developers, setDevelopers] = useState([])
   const [accessUserIds, setAccessUserIds] = useState(new Set())
@@ -162,7 +167,7 @@ export default function DevelopersTab({ projectId }) {
     ])
     if (devErr) setError(devErr.message)
     if (accessErr) setError(accessErr.message)
-    setDevelopers(devs ?? [])
+    setDevelopers((devs ?? []).filter((d) => canManageAccounts || d.id !== user.id))
     setAccessUserIds(new Set((access ?? []).map((a) => a.user_id)))
     setLoading(false)
   }
@@ -242,16 +247,18 @@ export default function DevelopersTab({ projectId }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-slate-500">Grant or revoke access to this project.</p>
-        <Button
-          variant={showInvite ? 'secondary' : 'primary'}
-          size="sm"
-          onClick={() => {
-            setShowInvite((s) => !s)
-            setInviteError(null)
-          }}
-        >
-          {showInvite ? 'Cancel' : '+ Invite developer'}
-        </Button>
+        {canManageAccounts && (
+          <Button
+            variant={showInvite ? 'secondary' : 'primary'}
+            size="sm"
+            onClick={() => {
+              setShowInvite((s) => !s)
+              setInviteError(null)
+            }}
+          >
+            {showInvite ? 'Cancel' : '+ Invite developer'}
+          </Button>
+        )}
       </div>
 
       {showInvite && (
@@ -331,7 +338,11 @@ export default function DevelopersTab({ projectId }) {
           <EmptyState
             icon={UsersIcon}
             title="No developer accounts yet"
-            description="Invite one above, or they'll appear here once they sign up."
+            description={
+              canManageAccounts
+                ? "Invite one above, or they'll appear here once they sign up."
+                : 'Ask an admin to create accounts for your teammates.'
+            }
           />
         ) : (
           <ul className="divide-y divide-slate-100">
@@ -349,25 +360,29 @@ export default function DevelopersTab({ projectId }) {
                     </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
-                    <button
-                      onClick={() => setResetTarget(dev)}
-                      title="Reset password"
-                      aria-label="Reset password"
-                      className="inline-flex items-center justify-center rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-                    >
-                      <KeyIcon className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => {
-                        setDeleteTarget(dev)
-                        setDeleteError(null)
-                      }}
-                      title="Delete account"
-                      aria-label="Delete account"
-                      className="inline-flex items-center justify-center rounded-lg p-1.5 text-red-400 hover:bg-red-50 hover:text-red-600"
-                    >
-                      <TrashIcon className="h-4 w-4" />
-                    </button>
+                    {canManageAccounts && (
+                      <>
+                        <button
+                          onClick={() => setResetTarget(dev)}
+                          title="Reset password"
+                          aria-label="Reset password"
+                          className="inline-flex items-center justify-center rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                        >
+                          <KeyIcon className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setDeleteTarget(dev)
+                            setDeleteError(null)
+                          }}
+                          title="Delete account"
+                          aria-label="Delete account"
+                          className="inline-flex items-center justify-center rounded-lg p-1.5 text-red-400 hover:bg-red-50 hover:text-red-600"
+                        >
+                          <TrashIcon className="h-4 w-4" />
+                        </button>
+                      </>
+                    )}
                     <Button
                       size="sm"
                       variant={hasAccess ? 'secondary' : 'primary'}

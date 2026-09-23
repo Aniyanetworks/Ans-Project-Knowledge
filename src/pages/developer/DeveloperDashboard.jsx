@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../contexts/AuthContext'
+import Button from '../../components/ui/Button'
 import Spinner from '../../components/ui/Spinner'
 import EmptyState from '../../components/ui/EmptyState'
+
+const inputClass =
+  'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm transition-shadow focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/30'
 
 function FolderIcon(props) {
   return (
@@ -42,19 +46,56 @@ function timeAgo(dateString) {
   return new Date(dateString).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
+const FILTERS = [
+  { value: 'all', label: 'All' },
+  { value: 'mine', label: 'Created by me' },
+  { value: 'shared', label: 'Shared with me' },
+]
+
 export default function DeveloperDashboard() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [projects, setProjects] = useState([])
   const [lastQuestions, setLastQuestions] = useState({}) // { [project_id]: { question, created_at } }
   const [loading, setLoading] = useState(true)
+  const [filter, setFilter] = useState('all')
+
+  const [showForm, setShowForm] = useState(false)
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
     load()
   }, [user])
 
+  async function handleCreate(e) {
+    e.preventDefault()
+    setCreating(true)
+    setError(null)
+    const { data, error } = await supabase
+      .from('projects')
+      .insert({ name, description, created_by: user.id })
+      .select()
+      .single()
+    setCreating(false)
+    if (error) {
+      setError(error.message)
+      return
+    }
+    // Straight into the new project so the owner can upload transcripts / add teammates.
+    navigate(`/projects/${data.id}`)
+  }
+
+  const visibleProjects = projects.filter((p) =>
+    filter === 'mine' ? p.created_by === user.id : filter === 'shared' ? p.created_by !== user.id : true
+  )
+
   async function load() {
     setLoading(true)
-    // RLS already scopes both queries to projects/history the developer has access to.
+    // RLS already scopes both queries to projects/history the developer has access
+    // to — both projects they created and projects others shared with them.
     const [{ data: projectRows, error }, { data: historyRows }] = await Promise.all([
       supabase.from('projects').select('*').eq('status', 'active').order('name'),
       supabase
@@ -77,30 +118,92 @@ export default function DeveloperDashboard() {
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
-      <h1 className="mb-1 text-2xl font-semibold tracking-tight text-slate-900">Your projects</h1>
-      <p className="mb-6 text-sm text-slate-500">Projects you've been granted access to.</p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="mb-1 text-2xl font-semibold tracking-tight text-slate-900">Your projects</h1>
+          <p className="text-sm text-slate-500">Projects you've created or been granted access to.</p>
+        </div>
+        <Button variant={showForm ? 'secondary' : 'primary'} onClick={() => setShowForm((s) => !s)}>
+          {showForm ? 'Cancel' : '+ New project'}
+        </Button>
+      </div>
+
+      {showForm && (
+        <form
+          onSubmit={handleCreate}
+          className="mb-8 space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
+        >
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Name</label>
+            <input required value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Description</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={2}
+              className={inputClass}
+            />
+          </div>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <Button type="submit" disabled={creating || !name.trim()}>
+            {creating ? 'Creating…' : 'Create project'}
+          </Button>
+        </form>
+      )}
+
+      {!loading && projects.length > 0 && (
+        <div className="mb-5 inline-flex rounded-lg border border-slate-200 bg-white p-0.5">
+          {FILTERS.map((f) => (
+            <button
+              key={f.value}
+              onClick={() => setFilter(f.value)}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                filter === f.value ? 'bg-accent-600 text-white' : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {loading ? (
         <div className="py-16 text-center text-sm text-slate-400">
           <Spinner label="Loading projects…" />
         </div>
-      ) : projects.length === 0 ? (
+      ) : visibleProjects.length === 0 ? (
         <EmptyState
           icon={FolderIcon}
           title="No projects yet"
-          description="You don't have access to any projects. Ask an admin to grant you access."
+          description={
+            filter === 'shared'
+              ? 'Nobody has shared a project with you yet.'
+              : 'Create a project to start uploading transcripts, or ask a teammate to share one with you.'
+          }
         />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {projects.map((p) => {
+          {visibleProjects.map((p) => {
             const last = lastQuestions[p.id]
+            const isOwner = p.created_by === user.id
             return (
               <Link
                 key={p.id}
                 to={`/projects/${p.id}`}
                 className="group rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-accent-300 hover:shadow-md"
               >
-                <p className="mb-1.5 font-medium text-slate-900 group-hover:text-accent-700">{p.name}</p>
+                <div className="mb-1.5 flex items-start justify-between gap-2">
+                  <p className="font-medium text-slate-900 group-hover:text-accent-700">{p.name}</p>
+                  <span
+                    className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
+                      isOwner ? 'bg-accent-100 text-accent-700' : 'bg-slate-100 text-slate-500'
+                    }`}
+                  >
+                    {isOwner ? 'Owner' : 'Shared'}
+                  </span>
+                </div>
                 <p className="line-clamp-2 text-sm text-slate-500">{p.description || 'No description'}</p>
                 {last && (
                   <div className="mt-3 flex items-start gap-1.5 border-t border-slate-100 pt-3 text-xs text-slate-400">
